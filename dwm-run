@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo dwm-run started >> ~/dwm-run.log
+
 userresources=$HOME/.Xresources
 usermodmap=$HOME/.Xmodmap
 sysresources=/etc/X11/xinit/.Xresources
@@ -15,7 +17,8 @@ test -f "$usermodmap"    && xmodmap     "$usermodmap"
 # start some nice programs
 eval $(ssh-agent)
 
-test $(which xsetroot)  && xsetroot -solid midnightblue &
+# igorg: we are doing it in set-wallpaper.sh
+#test $(which xsetroot)  && xsetroot -solid midnightblue &
 test $(which gpg-agent) && eval $(gpg-agent --daemon)
 
 if [ $(which xbanish) ]; then
@@ -24,28 +27,37 @@ elif [ $(which unclutter) ]; then
     unclutter &
 fi
 
+echo banish and unclutter done >> ~/dwm-run.log
+
 # source machine- and uname-specific xinitrcs
 xinitcfg="$HOME/.config/xinit"
 test -f "$xinitcfg/u/$(uname)"       && . "$xinitcfg/u/$(uname)"
 test -f "$xinitcfg/host/$(hostname)" && . "$xinitcfg/host/$(hostname)"
 
-/usr/local/bin/dwm 2>>.dwm_log &
 
-# exit X when dwmstatus (or failsafe xterm) is killed
+# run autostart script. It will decide which parts are run synchronously and which are run asynchronously
+# TODO: split it into two parts - synchronous and asynchronous
+$HOME/rc/autostart/autostart.sh 2>> ~/autostart.log
+#$HOME/rc/autostart/autostart.sh 2>> ~/autostart.log &
+
+# if slstatus/dwmstatus is present, launch them
+echo Launching slstatus/dwmstatus >> ~/dwm-run.log
+
 if [ $(which slstatus) ]; then
-    slstatus
+    slstatus &
 elif [ $(which dwmstatus) ]; then
-    dwmstatus
-elif [ $(which st) ]; then
-    st
-elif [ $(which urxvt) ]; then
-    urxvt
-elif [ $(which uxterm) ]; then
-    uxterm -ls -T Failsafe -geometry 80x24-0-0
-elif [ $(which rxvt) ]; then
-    rxvt
-elif [ $(which xterm) ]; then
-    xterm -ls -T Failsafe -geometry 80x24-0-0
-elif [ $(which gnome-terminal) ]; then
-    gmome-terminal
+    dwmstatus &
 fi
+
+
+echo "$(date): starting dwm, check ~/.dwm.log" >> ~/dwm-run.log
+# launch dwm (blocking)
+DWM_LOGFILE=~/.dwm.log
+DWM_ERROR_LOGFILE=~/.dwm-error.log
+echo "=============================================" >> $DWM_LOGFILE
+echo "$(date): starting dwm" >> $DWM_LOGFILE
+echo "$(date): starting dwm" >> $DWM_ERROR_LOGFILE
+echo "=============================================" >> $DWM_LOGFILE
+/usr/local/bin/dwm >> $DWM_LOGFILE 2>>$DWM_ERROR_LOGFILE
+
+echo "$(date): dwm exited" >> ~/dwm-run.log
